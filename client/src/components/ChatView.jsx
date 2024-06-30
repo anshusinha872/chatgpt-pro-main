@@ -14,6 +14,9 @@ import { davinci } from "../utils/davinci";
 import { dalle } from "../utils/dalle";
 import Modal from "./Modal";
 import Setting from "./Setting";
+import { storage } from "../utils/firebase";
+import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { app } from "../utils/firebase";
 
 const options = ["ChatGPT", "DALL·E"];
 const gptModel = ["gpt-3.5-turbo", "gpt-4"];
@@ -57,6 +60,7 @@ const ChatView = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [imageAvailable, setImageAvailable] = useState(false);
   const [imageArray, setImageArray] = useState([]);
+  const [imageURL, setImageURL] = useState([]);
   /**
    * Scrolls the chat area to the bottom.
    */
@@ -100,9 +104,27 @@ const ChatView = () => {
       return;
     }
     const cleanPrompt = replaceProfanities(formValue);
-    console.log(cleanPrompt);
-    return;
+    if (imageArray.length > 0) {
+      const promises = Array.from(imageArray).map((image) => {
+        const storageRef = ref(storage, `images/${image.name}`);
+        return uploadBytesResumable(storageRef, image).then((snapshot) => {
+          console.log("Uploaded a blob or file!", snapshot);
+          return getDownloadURL(storageRef).then((url) => {
+            return url;
+          });
+        });
+      });
+      // Promise.all(promises).then((urls) => {
+      //   setImageURL(urls);
+      // });
+      const uploadedImageURLs = await Promise.all(promises);
+      setImageURL(uploadedImageURLs);
+    }
+
     const newMsg = cleanPrompt;
+    const imagePrompt = imageURL.length > 0 
+    ? `Check these image URLs: ${imageURL.join(', ')}. Based on the given images, create a personalized email.`
+    : cleanPrompt;
     const aiModel = selected;
     const gptVersion = activeAiModel.id;
     setThinking(true);
@@ -110,7 +132,11 @@ const ChatView = () => {
     updateMessage(newMsg, false, aiModel);
     try {
       if (aiModel === options[0]) {
-        const LLMresponse = await davinci(cleanPrompt, key, activeAiModel.id);
+        const LLMresponse = await davinci(
+          imagePrompt,
+          key,
+          activeAiModel.id
+        );
         //const data = response.data.choices[0].message.content;
         LLMresponse && updateMessage(LLMresponse, true, aiModel);
       } else {

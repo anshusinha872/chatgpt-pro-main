@@ -6,6 +6,8 @@ import { ChatContext } from "../context/chatContext";
 import Thinking from "./Thinking";
 import { MdSend } from "react-icons/md";
 import { FaImages } from "react-icons/fa";
+import { IoIosAttach } from "react-icons/io";
+import { RxCross2 } from "react-icons/rx";
 
 import { replaceProfanities } from "no-profanity";
 import { davinci } from "../utils/davinci";
@@ -46,12 +48,15 @@ const ChatView = () => {
   const activeAiModel = useSelector((state) => state.user.activeAiModel);
   const messagesEndRef = useRef();
   const inputRef = useRef();
+  const fileInputRef = useRef(); // Create a ref for the file input element
   const [formValue, setFormValue] = useState("");
   const [thinking, setThinking] = useState(false);
   const [selected, setSelected] = useState(options[0]);
   const [gpt, setGpt] = useState(gptModel[0]);
   const [messages, addMessage] = useContext(ChatContext);
   const [modalOpen, setModalOpen] = useState(false);
+  const [imageAvailable, setImageAvailable] = useState(false);
+  const [imageArray, setImageArray] = useState([]);
   /**
    * Scrolls the chat area to the bottom.
    */
@@ -77,7 +82,6 @@ const ChatView = () => {
 
     addMessage(newMsg);
   };
-
   /**
    * Sends our prompt to our API and get response to our request from openai.
    *
@@ -90,13 +94,14 @@ const ChatView = () => {
       setModalOpen(true);
       return;
     }
-    if(!activeAiModel) {
+    if (!activeAiModel) {
       window.alert("Please select an AI model");
       setModalOpen(true);
       return;
     }
     const cleanPrompt = replaceProfanities(formValue);
-
+    console.log(cleanPrompt);
+    return;
     const newMsg = cleanPrompt;
     const aiModel = selected;
     const gptVersion = activeAiModel.id;
@@ -158,7 +163,7 @@ const ChatView = () => {
           aiModel.map((model, index) => (
             <a
               key={index}
-              onClick={() => 
+              onClick={() =>
                 dispatch({ type: "SET_ACTIVE_AI_MODEL", response: model })
               }
               className={`${activeAiModel.id == model.id && "tab-active"} tab`}
@@ -212,6 +217,52 @@ const ChatView = () => {
 
         <span ref={messagesEndRef}></span>
       </section>
+      {imageAvailable && (
+        <div className="px-4 sm:px-10 md:px-32">
+          <div className="image-card-container flex flex-row	">
+            {imageArray.length > 0 &&
+              Array.from(imageArray).map((image, index) => (
+                <div
+                  key={index}
+                  className="image-card m-2"
+                  style={{
+                    position: "relative",
+                    borderRadius: "10px",
+                    transition: "all 0.3s ease-in-out",
+                    background: "#2e3740",
+                    padding: "5px 0px 0px 0px",
+                  }}
+                >
+                  <span className="w-full flex justify-end">
+                    <RxCross2
+                      size={20}
+                      onClick={() => {
+                        setImageArray(
+                          Array.from(imageArray).filter((img) => img !== image)
+                        );
+                        if (imageArray.length === 1) {
+                          setImageAvailable(false);
+                        }
+                      }}
+                      style={{ cursor: "pointer" }}
+                    />
+                  </span>
+                  <img
+                    src={URL.createObjectURL(image)}
+                    alt=""
+                    className="image p-2"
+                    style={{
+                      width: "100px",
+                      height: "100px",
+                      objectFit: "cover",
+                    }}
+                  />
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       <form
         className="flex flex-col px-10 mb-2 md:px-32 join sm:flex-row"
         onSubmit={sendMessage}
@@ -232,7 +283,34 @@ const ChatView = () => {
             onKeyDown={handleKeyDown}
             onChange={(e) => setFormValue(e.target.value)}
           />
-          <input type="file" name="" className="image-upload-btn" id="" />
+          <input
+            ref={fileInputRef} // Assign the ref to the input element
+            type="file"
+            name=""
+            className="image-upload-btn"
+            id=""
+            onChange={(e) => {
+              if (e.target.files.length > 5) {
+                alert("You can only upload 5 images at a time");
+                return;
+              }
+              e.preventDefault();
+
+              setImageAvailable(true);
+              setImageArray(e.target.files);
+            }}
+            multiple={true}
+            accept="image/*"
+            maxLength={5}
+            style={{ display: "none" }} // Hide the input element
+          />
+          <button
+            type="button"
+            className="join-item btn"
+            onClick={() => fileInputRef.current.click()}
+          >
+            <IoIosAttach size={30} />
+          </button>
           <button type="submit" className="join-item btn" disabled={!formValue}>
             <MdSend size={30} />
           </button>
